@@ -1,15 +1,17 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:to_do/models/Item.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
-  var itens = new List<Item>();
+  List<Item> itens = new List<Item>();
 
   HomePage() {
     itens = [];
-    itens.add(Item(title: "Item 1", done: false));
+    /* itens.add(Item(title: "Item 1", done: false));
     itens.add(Item(title: "Item 2", done: false));
-    itens.add(Item(title: "Item 3", done: false));
+    itens.add(Item(title: "Item 3", done: false)); */
   }
 
   @override
@@ -22,11 +24,46 @@ class _HomePageState extends State<HomePage> {
   void add() {
     if (newTaskCtrl.text == "") return;
     setState(() {
-      widget.itens.add(
-        Item(title: newTaskCtrl.text, done: false),
-      );
+      widget.itens.add(Item(title: newTaskCtrl.text, done: false));
+      save();
     });
     newTaskCtrl.clear();
+  }
+
+  void remove(int index) {
+    setState(() {
+      widget.itens.removeAt(index);
+      save();
+    });
+  }
+
+  Future load() async {
+    var prefs = await SharedPreferences.getInstance();
+    var data = prefs.getString('data');
+
+    if (data != null) {
+      Iterable decoded = jsonDecode(data);
+      List<Item> result = decoded.map((x) => Item.fromJson(x)).toList();
+      setState(() {
+        widget.itens = result;
+      });
+    }
+  }
+
+  void save() async {
+    var prefs = await SharedPreferences.getInstance();
+    await prefs.setString('data', jsonEncode(widget.itens));
+  }
+
+  void change(bool value, int index) {
+    setState(() {
+      widget.itens[index].done = value;
+      save();
+    });
+  }
+
+  _HomePageState() {
+    load();
   }
 
   @override
@@ -60,15 +97,18 @@ class _HomePageState extends State<HomePage> {
         itemCount: widget.itens.length,
         itemBuilder: (BuildContext context, int index) {
           final item = widget.itens[index];
-
-          return CheckboxListTile(
-            title: Text(item.title),
-            value: item.done,
+          return Dismissible(
             key: Key(item.title),
-            onChanged: (value) {
-              setState(() {
-                item.done = value;
-              });
+            child: CheckboxListTile(
+              title: Text(item.title),
+              value: item.done,
+              onChanged: (value) => change(value, index),
+            ),
+            background: Container(
+              color: Colors.red.withOpacity(0.7),
+            ),
+            onDismissed: (direction) {
+              remove(index);
             },
           );
         },
